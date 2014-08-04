@@ -72,6 +72,18 @@ function Write-CustomOut ($Details){
 	Write-Host "$($LogDate) $Details"
 }
 
+function Import-Provider ([string]$Provider) {
+	if (-not $global:Providers[$Provider]) {
+		# Include the script
+		. ("{0}/Providers/{1}.ps1" -f $ScriptPath, $Provider)
+		
+		# Run the Connect function
+		Invoke-Expression ("Connect-vCheck{0}" -f $Provider)
+		
+		$global:Providers[$Provider] = $true
+	}
+}
+
 <# Search $file_content for name/value pair with ID_Name and return value #>
 Function Get-ID-String ($file_content,$ID_name) {
    if ($file_content | Select-String -Pattern "\$+$ID_name\s*=") {	
@@ -481,7 +493,7 @@ function Get-ReportResource {
             }
          }
          else {
-            Write-Warning ($lang.resFileWarn -f $cid)
+            Write-Warning ($global:lang.resFileWarn -f $cid)
          }
       }
       "SystemIcons" {
@@ -530,9 +542,9 @@ function Get-ReportResource {
 # Setup all paths required for script to run
 $ScriptPath = (Split-Path ((Get-Variable MyInvocation).Value).MyCommand.Path)
 $PluginsFolder = $ScriptPath + "\Plugins\"
-
+$global:Providers = @{}
 # Setup language hashtable
-Import-LocalizedData -BaseDirectory ($ScriptPath + "\lang") -BindingVariable lang
+Import-LocalizedData -BaseDirectory ($ScriptPath + "\lang") -BindingVariable global:lang
 
 # if we have the job parameter set, get the paths from the config file.
 if ($job) {
@@ -544,7 +556,7 @@ if ($job) {
    }
    else {      
       $GlobalVariables = $ScriptPath + "\GlobalVariables.ps1"
-      Write-Warning ($lang.gvInvalid -f $GlobalVariables)
+      Write-Warning ($global:lang.gvInvalid -f $GlobalVariables)
    }
    
    # Get Plugin paths
@@ -555,7 +567,7 @@ if ($job) {
       }
       else {      
          $PluginPaths += $ScriptPath + "\Plugins"
-         Write-Warning ($lang.pluginpathInvalid -f $PluginPath, ($ScriptPath + "\Plugins"))
+         Write-Warning ($global:lang.pluginpathInvalid -f $PluginPath, ($ScriptPath + "\Plugins"))
       }
    }
    $PluginPaths = $PluginPaths | Sort-Object -unique
@@ -572,7 +584,7 @@ if ($job) {
          }
          # Plugin not found in any search path
          elseif ($testedPaths -eq $PluginPaths.Count) {
-            Write-Warning ($lang.pluginInvalid -f $plugin)
+            Write-Warning ($global:lang.pluginInvalid -f $plugin)
          }
       }
    }
@@ -595,7 +607,7 @@ $SetupSetting = Invoke-Expression (($file[$SetupLine]).Split("="))[1]
 
 if ($SetupSetting -or $config) {
 	Clear-Host 
-   ($lang.GetEnumerator() | where {$_.Name -match "setupMsg[0-9]*"} | Sort-Object Name) | Foreach {
+   ($global:lang.GetEnumerator() | where {$_.Name -match "setupMsg[0-9]*"} | Sort-Object Name) | Foreach {
       Write-Host -foreground $host.PrivateData.WarningForegroundColor -background $host.PrivateData.WarningBackgroundColor $_.value
    }
 	
@@ -611,7 +623,7 @@ if ($SetupSetting -or $config) {
 $vcvars = @("SetupWizard" , "Server" , "SMTPSRV" , "EmailFrom" , "EmailTo" , "EmailSubject", "DisplaytoScreen" , "SendEmail" , "SendAttachment", "TimeToRun" , "PluginSeconds" , "Style" , "Date")
 foreach($vcvar in $vcvars) {
 	if (!($(Get-Variable -Name "$vcvar" -Erroraction 'SilentlyContinue'))) {
-		Write-Error ($lang.varUndefined -f $vcvar)
+		Write-Error ($global:lang.varUndefined -f $vcvar)
 	} 
 }
 
@@ -640,16 +652,16 @@ $PluginResult = @()
 Write-Host "`nBegin Plugin Processing" -foreground $host.PrivateData.WarningForegroundColor -background $host.PrivateData.WarningBackgroundColor
 # Loop over all enabled plugins
 $p = 0 
-$vCheckPlugins | Foreach {
+@($vCheckPlugins) | Foreach {
 	$TableFormat = $null
 	$PluginInfo = Get-PluginID $_.Fullname
 	$p++
-	Write-CustomOut ($lang.pluginStart -f $PluginInfo["Title"], $PluginInfo["Author"], $PluginInfo["Version"], $p, $vCheckPlugins.count)
-	$pluginStatus = ($lang.pluginStatus -f $p, $vCheckPlugins.count, $_.Name)
-	Write-Progress -ID 1 -Activity $lang.pluginActivity -Status $pluginStatus -PercentComplete (100*$p/($vCheckPlugins.count))
+	Write-CustomOut ($global:lang.pluginStart -f $PluginInfo["Title"], $PluginInfo["Author"], $PluginInfo["Version"], $p, $vCheckPlugins.count)
+	$pluginStatus = ($global:lang.pluginStatus -f $p, $vCheckPlugins.count, $_.Name)
+	Write-Progress -ID 1 -Activity $global:lang.pluginActivity -Status $pluginStatus -PercentComplete (100*$p/($vCheckPlugins.count))
 	$TTR = [math]::round((Measure-Command {$Details = . $_.FullName}).TotalSeconds, 2)
 
-	Write-CustomOut ($lang.pluginEnd -f $PluginInfo["Title"], $PluginInfo["Author"], $PluginInfo["Version"], $p, $vCheckPlugins.count)
+	Write-CustomOut ($global:lang.pluginEnd -f $PluginInfo["Title"], $PluginInfo["Author"], $PluginInfo["Version"], $p, $vCheckPlugins.count)
 
 	$PluginResult += New-Object PSObject -Property @{"Title" = $PluginInfo["Title"];
 																	 "Author" = $PluginInfo["Author"];
@@ -661,7 +673,7 @@ $vCheckPlugins | Foreach {
 																	 "Comments" = $Comments;
 																	 "TimeToRun" = $TTR; }
 }
-Write-Progress -ID 1 -Activity $lang.pluginActivity -Status $lang.Complete -Completed
+Write-Progress -ID 1 -Activity $global:lang.pluginActivity -Status $global:lang.Complete -Completed
 
 ################################################################################
 #                                    Output                                    #
@@ -688,7 +700,7 @@ Foreach ( $pr in $PluginResult) {
 # Add Time to Run detail for plugins - if specified in GlobalVariables.ps1
 if ($TimeToRun) {
    $Finished = Get-Date
-   $MyReport += Get-CustomHeader ($lang.repTime -f [math]::round(($Finished - $Date).TotalMinutes,2), ($Finished.ToLongDateString()), ($Finished.ToLongTimeString())) ($lang.slowPlugins -f $PluginSeconds)
+   $MyReport += Get-CustomHeader ($global:lang.repTime -f [math]::round(($Finished - $Date).TotalMinutes,2), ($Finished.ToLongDateString()), ($Finished.ToLongTimeString())) ($global:lang.slowPlugins -f $PluginSeconds)
    $TTRReport = $PluginResult | Where { $_.TimeToRun -gt $PluginSeconds } | Select Title, TimeToRun | Sort-Object TimeToRun -Descending
    $MyReport += Get-HTMLList $TTRReport 
    $MyReport += Get-CustomHeaderClose
@@ -718,13 +730,13 @@ $embedReport | Out-File -encoding ASCII -filepath $Filename
 
 # Display to screen
 if ($DisplayToScreen) {
-	Write-CustomOut $lang.HTMLdisp  
+	Write-CustomOut $global:lang.HTMLdisp  
 	Invoke-Item $Filename
 }
 
 # Generate email
 if ($SendEmail) {
-	Write-CustomOut $lang.emailSend
+	Write-CustomOut $global:lang.emailSend
    $msg = New-Object System.Net.Mail.MailMessage ($EmailFrom,$EmailTo)
    # If CC address specified, add
    If ($EmailCc -ne "") {
@@ -734,7 +746,7 @@ if ($SendEmail) {
    
    # if send attachment, just send plaintext email with HTML report attached
    If ($SendAttachment) {
-      $msg.Body = $lang.emailAtch
+      $msg.Body = $global:lang.emailAtch
       $attachment = new-object System.Net.Mail.Attachment $Filename
       $msg.Attachments.Add($attachment)
    }
