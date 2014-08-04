@@ -1,6 +1,38 @@
+<#
+I should add a header...
+
+#>
+################################################################################
+#                               Initialization                                 #
+################################################################################
+# Load default strings
+$pLang = DATA {    
+ConvertFrom-StringData @' 
+   connReuse = Re-using connection to VI Server
+   connOpen  = Connecting to VI Server
+   connError = Unable to connect to vCenter, please ensure you have altered the vCenter server address correctly. To specify a username and password edit the connection string in the file $GlobalVariables
+   custAttr  = Adding Custom properties
+   collectVM = Collecting VM Objects
+   collectHost = Collecting VM Host Objects
+   collectCluster = Collecting Cluster Objects
+   collectDatastore = Collecting Datastore Objects
+   collectDVM = Collecting Detailed VM Objects
+   collectTemplate = Collecting Template Objects
+   collectDVIO = Collecting Detailed VI Objects
+   collectAlarm = Collecting Detailed Alarm Objects
+   collectDHost = Collecting Detailed VMHost Objects
+   collectDCluster = Collecting Detailed Cluster Objects
+   collectDDatastore = Collecting Detailed Datastore Objects
+   collectDDatastoreCluster = Collecting Detailed Datastore Cluster Objects
+'@ }
+
 # Add Provider strings to global lang variable
-Import-LocalizedData -BaseDirectory ($ScriptPath + "\lang") -FileName Provider-vSphere -BindingVariable pLang
+Import-LocalizedData -BaseDirectory ($ScriptPath + "\lang") -FileName Provider-vSphere -BindingVariable pLang -ErrorAction SilentlyContinue
 $global:lang+=$pLang
+
+# Init Provider hashtable
+$global:Providers.Add("vSphere", @{"Data" = @{}})
+
 
 ################################################################################
 #                              REQUIRED FUNCTIONS                              #
@@ -31,10 +63,15 @@ function Connect-vCheckvSphere() {
 }
 
 <# Disconnect vCenter connection #>
-function Disconnect-vCheckvSphere() {
+function global:Disconnect-vCheckvSphere() {
 	if ($VIConnection) {
 		$VIConnection | Disconnect-VIServer -Confirm:$false
 	}
+	
+	# Remove vSphere cache
+	$global:Providers.Remove("vSphere")
+	# Run garbage collector to free memory
+	[gc]::Collect()
 }
 
 <# Get a vCheck Object. On susequent requests, return a cached value unless explicitly told not to #>
@@ -43,12 +80,11 @@ function global:Get-vCheckvSphereObject  {
 
 	# if force is set, retrieve the object again by clearing the cached copy
 	if ($force) {
-		Remove-Variable -scope global -name $ObjName -ErrorAction SilentlyContinue
+		$global:Providers.vSphere.Data.$ObjName = $null
 	}
-	
 	# If we already have this object, return the cached value
-	if (Test-Path variable:global:$objName) {
-		return (Get-Variable -Scope Global -Name $objName -ValueOnly)
+	if ($global:Providers.vSphere.Data.$ObjName -ne $null) {
+		return ($global:Providers.vSphere.Data.$ObjName)
 	}
 	else{
 		switch ($ObjName) {
@@ -57,13 +93,13 @@ function global:Get-vCheckvSphereObject  {
 			"HostsViews" { Write-CustomOut $global:lang.collectDHost;
 						  $value = Get-View -ViewType hostsystem }
 		}
-		Set-Variable -Scope Global -Name $objName -Value $value
+		$global:Providers.vSphere.Data.Add($ObjName, $value)
 	}
 	return $value
 }
 
 ################################################################################
-#                              PROVIDER FUNCTIONS                              #
+#                         vSphere Provider Functions                           #
 ################################################################################
 # This section contains any global functions for this provider to save on code 
 # duplication

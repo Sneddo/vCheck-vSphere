@@ -79,8 +79,6 @@ function Import-Provider ([string]$Provider) {
 		
 		# Run the Connect function
 		Invoke-Expression ("Connect-vCheck{0}" -f $Provider)
-		
-		$global:Providers[$Provider] = $true
 	}
 }
 
@@ -543,6 +541,7 @@ function Get-ReportResource {
 $ScriptPath = (Split-Path ((Get-Variable MyInvocation).Value).MyCommand.Path)
 $PluginsFolder = $ScriptPath + "\Plugins\"
 $global:Providers = @{}
+
 # Setup language hashtable
 Import-LocalizedData -BaseDirectory ($ScriptPath + "\lang") -BindingVariable global:lang
 
@@ -658,7 +657,7 @@ $p = 0
 	$p++
 	Write-CustomOut ($global:lang.pluginStart -f $PluginInfo["Title"], $PluginInfo["Author"], $PluginInfo["Version"], $p, $vCheckPlugins.count)
 	$pluginStatus = ($global:lang.pluginStatus -f $p, $vCheckPlugins.count, $_.Name)
-	Write-Progress -ID 1 -Activity $global:lang.pluginActivity -Status $pluginStatus -PercentComplete (100*$p/($vCheckPlugins.count))
+	Write-Progress -ID 1 -Activity $global:lang.pluginActivity -Status $pluginStatus -PercentComplete (100*($p-1)/($vCheckPlugins.count))
 	$TTR = [math]::round((Measure-Command {$Details = . $_.FullName}).TotalSeconds, 2)
 
 	Write-CustomOut ($global:lang.pluginEnd -f $PluginInfo["Title"], $PluginInfo["Author"], $PluginInfo["Version"], $p, $vCheckPlugins.count)
@@ -674,6 +673,11 @@ $p = 0
 																	 "TimeToRun" = $TTR; }
 }
 Write-Progress -ID 1 -Activity $global:lang.pluginActivity -Status $global:lang.Complete -Completed
+
+# loop over providers and call Disconnect function
+foreach ($p in $global:Providers.Keys.GetEnumerator()) {
+	Invoke-Expression ("Disconnect-vCheck{0}" -f $p)
+}
 
 ################################################################################
 #                                    Output                                    #
