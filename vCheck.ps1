@@ -675,7 +675,7 @@ $p = 0
 Write-Progress -ID 1 -Activity $global:lang.pluginActivity -Status $global:lang.Complete -Completed
 
 # loop over providers and call Disconnect function
-foreach ($p in $global:Providers.Keys.GetEnumerator()) {
+foreach ($p in @($global:Providers.Keys.GetEnumerator())) {
 	Invoke-Expression ("Disconnect-vCheck{0}" -f $p)
 }
 
