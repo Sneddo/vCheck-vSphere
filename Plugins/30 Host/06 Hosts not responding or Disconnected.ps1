@@ -8,7 +8,7 @@
 # Requires the vSphere provider for information
 Import-Provider vSphere
 
-$RespondHosts = @((Get-vCheckvSphereObject "Hosts") | where {$_.Runtime.ConnectionState -notmatch "Connected|Maintenance"} | Select name, @{N="Connection State";E={$_.ExtensionData.Runtime.ConnectionState}}, @{N="Power State";E={$_.ExtensionData.Runtime.PowerState}})
+$RespondHosts = @((Get-vCheckvSphereObject "Hosts") | where {$_.ConnectionState -ne "Connected" -and $_.ConnectionState -ne "Maintenance"} | Select name, @{N="Connection State";E={$_.ExtensionData.Runtime.ConnectionState}}, @{N="Power State";E={$_.ExtensionData.Runtime.PowerState}})
 $RespondHosts
 
 $Title = "Hosts Not responding or Disconnected"
@@ -18,3 +18,5 @@ $Display = "Table"
 $Author = "Alan Renouf"
 $PluginVersion = 1.2
 $PluginCategory = "vSphere"
+
+Remove-Variable RespondHosts

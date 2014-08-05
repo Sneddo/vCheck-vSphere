@@ -9,9 +9,8 @@ $ntpserver ="pool.ntp.org|pool2.ntp.org"
 
 # Requires the vSphere provider for information
 Import-Provider vSphere
-$VMH = Get-vCheckvSphereObject "Hosts"
 
-$Result = @($VMH | Where {$_.Connectionstate -ne "Disconnected"} | Select Name, @{N="NTPServer";E={$_ | Get-VMHostNtpServer}}, @{N="ServiceRunning";E={(Get-VmHostService -VMHost $_ | Where-Object {$_.key -eq "ntpd"}).Running}} | Where {$_.ServiceRunning -eq $false -or $_.NTPServer -notmatch $ntpserver})
+$Result = @(Get-vCheckvSphereObject "Hosts" | Where {$_.Connectionstate -ne "Disconnected"} | Select Name, @{N="NTPServer";E={$_ | Get-VMHostNtpServer}}, @{N="ServiceRunning";E={(Get-VmHostService -VMHost $_ | Where-Object {$_.key -eq "ntpd"}).Running}} | Where {$_.ServiceRunning -eq $false -or $_.NTPServer -notmatch $ntpserver})
 $Result
 
 $Title = "NTP Name and Service"
@@ -21,3 +20,5 @@ $Display = "Table"
 $Author = "Alan Renouf"
 $PluginVersion = 1.2
 $PluginCategory = "vSphere"
+
+Remove-Variable Result

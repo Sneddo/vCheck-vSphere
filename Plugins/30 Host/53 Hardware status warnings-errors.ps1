@@ -39,9 +39,6 @@ foreach ($HostsView in ($HostsViews|?{$_.runtime.connectionstate -eq "Connected"
 			}
 		}
 	}
-	Remove-Variable -name "HWStatus" -WarningAction SilentlyContinue -ErrorAction SilentlyContinue
-	Remove-Variable -name "HWStatusDetails" -WarningAction SilentlyContinue -ErrorAction SilentlyContinue
-	Remove-Variable -name "HealthStatusDetails" -WarningAction SilentlyContinue -ErrorAction SilentlyContinue
 }
 
 $HWalarms
@@ -53,3 +50,5 @@ $Display = "Table"
 $Author = "Raphael Schitz"
 $PluginVersion = 1.2
 $PluginCategory = "vSphere"
+
+Remove-Variable HWalarms, HWStatus, HWStatusDetails, HealthStatusDetails

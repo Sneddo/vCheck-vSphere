@@ -17,6 +17,7 @@ ConvertFrom-StringData @'
    custAttr  = Adding Custom properties
    collectVM = Collecting VM Objects
    collectHost = Collecting VM Host Objects
+   collectHostProfile = Collecting Host Profiles
    collectCluster = Collecting Cluster Objects
    collectDatastore = Collecting Datastore Objects
    collectDVM = Collecting Detailed VM Objects
@@ -27,6 +28,7 @@ ConvertFrom-StringData @'
    collectDCluster = Collecting Detailed Cluster Objects
    collectDDatastore = Collecting Detailed Datastore Objects
    collectDDatastoreCluster = Collecting Detailed Datastore Cluster Objects
+   collectvSwitch = Collecting vSwitch Objects
    requirementNotFound = Requirement not found on this host: {0}
 '@ }
 
@@ -86,22 +88,36 @@ function global:Get-vCheckvSphereObject  {
 	# If we do not have cashed data, recalculate
 	if ($global:Providers.vSphere.Data.$ObjName -eq $null) {
 		switch ($ObjName) {
-			"ServiceInstance" { Write-CustomOut $pLang.collectDVIO
-							    $ServiceInstance = get-view ServiceInstance }
+			"ServiceInstance" { Write-CustomOut $global:Providers.vSphere.lang.collectDVIO
+							    $global:Providers.vSphere.Data.Add($ObjName, (Get-View ServiceInstance)) }
 			"AlarmManager"	{ $ServiceInstance = Get-vCheckvSphereObject ServiceInstance
-							  Write-CustomOut $pLang.collectAlarm
-							  $alarmMgr = get-view $ServiceInstance.Content.alarmManager }
-			"ClusterViews"	{ Write-CustomOut $pLang.collectDCluster
-							  $value = Get-View -ViewType ClusterComputeResource }
+							  Write-CustomOut $global:Providers.vSphere.lang.collectAlarm
+							  $global:Providers.vSphere.Data.Add($ObjName, (get-view $ServiceInstance.Content.alarmManager)) }
+			"HostProfiles"  { Write-CustomOut $global:Providers.vSphere.lang.collectHostProfile
+							  $global:Providers.vSphere.Data.Add($ObjName, (Get-VMHostProfile)) }
+			"Clusters"		{ Write-CustomOut $global:Providers.vSphere.lang.collectCluster
+							  $global:Providers.vSphere.Data.Add($ObjName, (Get-Cluster | Sort Name)) }
+			"ClusterViews"	{ Write-CustomOut $global:Providers.vSphere.lang.collectDCluster
+							  $global:Providers.vSphere.Data.Add($ObjName, (Get-View -ViewType ClusterComputeResource)) }
 			"Hosts"  		{ Write-CustomOut $global:Providers.vSphere.lang.collectHost;
-							  $value = (Get-VMHost | Sort Name);  }
+							  $global:Providers.vSphere.Data.Add($ObjName,(Get-VMHost | Sort Name))  }
 			"HostsViews"	{ Write-CustomOut $global:Providers.vSphere.lang.collectDHost;
-							  $value = Get-View -ViewType hostsystem }
-			"VMs" 			{ Write-CustomOut $global:Providers.vSphere.lang.collectVM
-							  $value = Get-VM | Sort Name }
-
+							  $global:Providers.vSphere.Data.Add($ObjName, (Get-View -ViewType hostsystem)) }
+			"vSwitches"		{ Write-CustomOut $global:Providers.vSphere.lang.collectvSwitch;
+							  $global:Providers.vSphere.Data.Add($ObjName, (Get-VirtualSwitch)) }
+			"Datastores"	{ Set-DatastoreCustomProperties;
+							  Write-CustomOut $global:Providers.vSphere.lang.collectDatastore;
+							  $global:Providers.vSphere.Data.Add($ObjName, (Get-Datastore | Sort Name)) }
+			"DatastoresViews" { Write-CustomOut $global:Providers.vSphere.lang.collectDDatastore
+							  $global:Providers.vSphere.Data.Add($ObjName, (Get-View -ViewType Datastore)) }
+			"VMs" 			{ Set-VMCustomProperties;
+							  Write-CustomOut $global:Providers.vSphere.lang.collectVM
+							  $global:Providers.vSphere.Data.Add($ObjName, (Get-VM | Sort Name)) }
+			"VMsViews"		{ Write-CustomOut $global:Providers.vSphere.lang.collectDVM
+							  $global:Providers.vSphere.Data.Add($ObjName, (Get-View -ViewType VirtualMachine | Where {-not $_.Config.Template})) }
+			"Templates"		{ Write-CustomOut $global:Providers.vSphere.lang.collectTemplate 
+							  $global:Providers.vSphere.Data.Add($ObjName, (Get-Template)) }
 		}
-		$global:Providers.vSphere.Data.Add($ObjName, $value)
 	}
 	return ($global:Providers.vSphere.Data.$ObjName)
 }
@@ -111,7 +127,7 @@ function global:Get-vCheckvSphereObject  {
 ################################################################################
 # This section contains any global functions for this provider to save on code 
 # duplication
-function Add-vCheckvSphereRequirement ([string]$Name) {
+function global:Add-vCheckvSphereRequirement ([string]$Name) {
 	if ((Get-PSSnapin -name $Name -erroraction silentlycontinue) -or ((Get-Module $Name).Count -gt 0)) {
 		return $true
 	}
@@ -130,7 +146,7 @@ function Add-vCheckvSphereRequirement ([string]$Name) {
 	return $false
 }
 
-function Get-VMLastPoweredOffDate {
+function global:Get-VMLastPoweredOffDate {
   param([Parameter(Mandatory=$true,ValueFromPipeline=$true)]
         [VMware.VimAutomation.ViCore.Impl.V1.Inventory.VirtualMachineImpl] $vm)
   process {
@@ -143,7 +159,7 @@ function Get-VMLastPoweredOffDate {
   }
 }
 
-function Get-VMLastPoweredOnDate {
+function global:Get-VMLastPoweredOnDate {
   param([Parameter(Mandatory=$true,ValueFromPipeline=$true)]
         [VMware.VimAutomation.ViCore.Impl.V1.Inventory.VirtualMachineImpl] $vm)
 
@@ -155,4 +171,24 @@ function Get-VMLastPoweredOnDate {
        Select-Object -First 1).CreatedTime
      $Report
   }
+}
+
+function global:Set-VMCustomProperties {
+	# Add VM custom properties
+	Write-CustomOut $global:Providers.vSphere.lang.custAttr
+	New-VIProperty -Name LastPoweredOffDate -ObjectType VirtualMachine -Value {(Get-VMLastPoweredOffDate -vm $Args[0]).LastPoweredOffDate} | Out-Null
+	New-VIProperty -Name LastPoweredOnDate -ObjectType VirtualMachine -Value {(Get-VMLastPoweredOnDate -vm $Args[0]).LastPoweredOnDate} | Out-Null
+
+	New-VIProperty -Name "HWVersion" -ObjectType VirtualMachine -Value {
+		param($vm)
+
+		$vm.ExtensionData.Config.Version.Substring(4)
+	} -BasedOnExtensionProperty "Config.Version" -Force | Out-Null
+}
+
+function global:Set-DatastoreCustomProperties {
+	New-VIProperty -Name PercentFree -ObjectType Datastore -Value {
+		param($ds)
+		[math]::Round(((100 * ($ds.FreeSpaceMB)) / ($ds.CapacityMB)),0)
+	} -Force | Out-Null
 }

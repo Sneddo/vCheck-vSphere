@@ -9,9 +9,8 @@ $SyslogServer = "syslogserver"
 
 # Requires the vSphere provider for information
 Import-Provider vSphere
-$VMH = Get-vCheckvSphereObject "Hosts"
 
-@($VMH | Where-Object {$_.ExtensionData.Summary.Config.Product.Name -eq 'VMware ESXi'} | Select-Object Name,@{Name='SyslogServer';Expression = {($_ | Get-VMHostSysLogServer).Host}},@{Name='SyslogSetting';Expression = {($_ | Get-AdvancedSetting -Name Syslog.Local.DatastorePath).Value| Where-Object {$_ -ne $NULL}}} | Where-Object {$_.SyslogServer -ne $SyslogServer -and $_.SyslogSetting -ne $SyslogServer})
+@(Get-vCheckvSphereObject "Hosts" | Where-Object {$_.ExtensionData.Summary.Config.Product.Name -eq 'VMware ESXi'} | Select-Object Name,@{Name='SyslogServer';Expression = {($_ | Get-VMHostSysLogServer).Host}},@{Name='SyslogSetting';Expression = {($_ | Get-AdvancedSetting -Name Syslog.Local.DatastorePath).Value| Where-Object {$_ -ne $NULL}}} | Where-Object {$_.SyslogServer -ne $SyslogServer -and $_.SyslogSetting -ne $SyslogServer})
 
 $Title = "Syslog Name"
 $Header = "Syslog Issues"

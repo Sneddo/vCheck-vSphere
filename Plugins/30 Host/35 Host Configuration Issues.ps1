@@ -22,8 +22,7 @@ $i = 1
 foreach ($HostsView in $HostsViews) {
 	Write-Progress -ID 2 -Parent 1 -Activity $pluginLang.progressActivity -Status ($HostsView.Name) -PercentComplete (100*$i/($HostsViews.count))
 	if ($HostsView.ConfigIssue) {           
-		$HostConfigIssues = $HostsView.ConfigIssue
-		Foreach ($HostConfigIssue in $HostConfigIssues) {
+		Foreach ($HostConfigIssue in $HostsView.ConfigIssue) {
 			$Details = "" | Select-Object Name, Message
 			$Details.Name = $HostsView.name
 			$Details.Message = $HostConfigIssue.FullFormattedMessage
@@ -43,3 +42,5 @@ $Display = "Table"
 $Author = "Alan Renouf"
 $PluginVersion = 1.2
 $PluginCategory = "vSphere"
+
+Remove-Variable hostcialarms

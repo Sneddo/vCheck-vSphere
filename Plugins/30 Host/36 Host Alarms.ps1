@@ -14,9 +14,8 @@ $HostsViews = Get-vCheckvSphereObject "HostsViews"
 $alarms = $alarmMgr.GetAlarm($null) | select value, @{N="name";E={(Get-View -Id $_).Info.Name}}
 $hostsalarms = @()
 foreach ($HostsView in $HostsViews){
-	if ($HostsView.TriggeredAlarmState){
-		$hostsTriggeredAlarms = $HostsView.TriggeredAlarmState
-		Foreach ($hostsTriggeredAlarm in $hostsTriggeredAlarms){
+	if ($HostsView.TriggeredAlarmState){	
+		Foreach ($hostsTriggeredAlarm in $HostsView.TriggeredAlarmState){
 			$Details = "" | Select-Object Object, Alarm, Status, Time
 			$Details.Object = $HostsView.name
 			$Details.Alarm = ($alarms | Where {$_.value -eq ($hostsTriggeredAlarm.alarm.value)}).name
@@ -40,3 +39,4 @@ $PluginCategory = "vSphere"
 $TableFormat = @{"Status" = @(@{ "-eq 'yellow'"     = "Row,class|warning"; },
 							  @{ "-eq 'red'"     = "Row,class|critical" })
 				}
+Remove-Variable hostsalarms

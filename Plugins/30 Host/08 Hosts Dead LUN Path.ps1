@@ -8,19 +8,15 @@
 
 # Requires the vSphere provider for information
 Import-Provider vSphere
-$HostsViews = Get-vCheckvSphereObject "HostsViews"
 
 $deadluns = @()
-foreach ($esxhost in ($HostsViews | where {$_.Runtime.ConnectionState -match "Connected|Maintenance"})) {
+foreach ($esxhost in (Get-vCheckvSphereObject "HostsViews" | where {$_.Runtime.ConnectionState -match "Connected|Maintenance"})) {
 	$esxhost | %{$_.config.storageDevice.multipathInfo.lun} | %{$_.path} | ?{$_.State -eq "Dead"} | %{
-		$myObj = "" | Select VMHost, Lunpath, State
-		$myObj.VMHost = $esxhost.Name
-		$myObj.Lunpath = $_.Name
-		$myObj.State = $_.state
-		$deadluns += $myObj
+		$deadluns += New-Object PSObject -Property @{"VMHost" = $esxhost.Name; 
+													 "Lunpath" = $_.Name;
+													 "State" = $_.state }
 	}
 }
-	
 $deadluns
 
 $Title = "Hosts Dead LUN Path"
@@ -30,3 +26,5 @@ $Display = "Table"
 $Author = "Alan Renouf, Frederic Martin"
 $PluginVersion = 1.2
 $PluginCategory = "vSphere"
+
+Remove-Variable deadluns

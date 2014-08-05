@@ -8,11 +8,10 @@
 
 # Requires the vSphere provider for information
 Import-Provider vSphere
-$VMH = Get-vCheckvSphereObject "Hosts"
 
 $ESXiTechMode = @()
-$ESXiTechMode += $VMH | Where { ($_.Version -lt 4.1) -and ($_.ConnectionState -eq "Connected" -or $_.ConnectionState -eq "Maintenance") -and ($_.ExtensionData.Summary.Config.Product.Name -match "i")} | Select Name, @{N="TechSuportModeEnabled";E={($_ | Get-VMHostAdvancedConfiguration -Name VMkernel.Boot.techSupportMode).Values}} | Where { $_.TechSuportModeEnabled -eq "True" }
-$ESXiTechMode += $VMH | Where { $_.Version -ge "4.1.0" } | Where {$_.ConnectionState -eq "Connected" -or $_.ConnectionState -eq "Maintenance"} | Select Name, @{N="TechSuportModeEnabled";E={($_ | Get-VMHostService | Where {$_.key -eq "TSM"}).Running}} | Where { $_.TechSuportModeEnabled -eq "True" }
+$ESXiTechMode += Get-vCheckvSphereObject "Hosts" | Where { ($_.Version -lt 4.1) -and ($_.ConnectionState -eq "Connected" -or $_.ConnectionState -eq "Maintenance") -and ($_.ExtensionData.Summary.Config.Product.Name -match "i")} | Select Name, @{N="TechSuportModeEnabled";E={($_ | Get-VMHostAdvancedConfiguration -Name VMkernel.Boot.techSupportMode).Values}} | Where { $_.TechSuportModeEnabled -eq "True" }
+$ESXiTechMode += Get-vCheckvSphereObject "Hosts" | Where { $_.Version -ge "4.1.0" } | Where {$_.ConnectionState -eq "Connected" -or $_.ConnectionState -eq "Maintenance"} | Select Name, @{N="TechSuportModeEnabled";E={($_ | Get-VMHostService | Where {$_.key -eq "TSM"}).Running}} | Where { $_.TechSuportModeEnabled -eq "True" }
 $ESXiTechMode
 
 $Title = "ESXi with Technical Support mode or ESXi Shell enabled"
@@ -22,3 +21,5 @@ $Display = "Table"
 $Author = "Alan Renouf"
 $PluginVersion = 1.3
 $PluginCategory = "vSphere"
+
+Remove-Variable ESXiTechMode

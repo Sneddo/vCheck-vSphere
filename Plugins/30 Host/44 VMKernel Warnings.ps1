@@ -8,12 +8,22 @@ $simpleWarning = $true
 ## 1.2 : ???
 ## 1.3 : Added Provider code
 
+# Setup default strings
+$pluginLang = DATA {
+    ConvertFrom-StringData @'
+		progressActivity = Gathering Host VMKernel Warnings
+'@ }
+# If a localized version is available, overwrite the defaults
+Import-LocalizedData -BaseDirectory ($ScriptPath + "\lang") -bindingVariable pluginLang -ErrorAction SilentlyContinue
+
 # Requires the vSphere provider for information
 Import-Provider vSphere
 $HostsViews = Get-vCheckvSphereObject "HostsViews"
 
 $VMKernelWarnings = @()
+$i=0
 foreach ($VMHost in ($HostsViews)){
+	Write-Progress -ID 2 -Parent 1 -Activity $pluginLang.progressActivity -Status ($HostsView.Name) -PercentComplete (100*$i/($HostsViews.count))
 	$product = $VMHost.config.product.ProductLineId
 	if ($product -eq "embeddedEsx" -and $VIVersion -lt 5){
 		$Warnings = (Get-Log -vmhost ($VMHost.name) -Key messages -ErrorAction SilentlyContinue).entries |where {$_ -match "warning" -and $_ -match "vmkernel"}
@@ -39,7 +49,9 @@ foreach ($VMHost in ($HostsViews)){
 		}
 		$VMKernelWarnings += $VMKernelWarning | Sort-Object -Property Length -Unique |select VMHost, Message, KBSearch, Google			
 	}
-}	
+	$i++
+}
+Write-Progress -ID 2 -Parent 1 -Activity $pluginLang.progressActivity -Status $global:lang.Complete -Completed
 			
 $VMKernelWarnings | Sort-Object Message -Descending
 
@@ -50,3 +62,5 @@ $Display = "Table"
 $Author = "Alan Renouf, Frederic Martin"
 $PluginVersion = 1.3
 $PluginCategory = "vSphere"
+
+Remove-Variable HostsViews, VMKernelWarnings

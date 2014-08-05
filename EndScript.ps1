@@ -1,3 +1,3 @@
 ﻿# Everything in this script will run at the end of vCheck
-Remove-Variable -name lang -scope global
+Remove-Variable ReportResources, lang -ErrorAction SilentlyContinue
 [gc]::Collect()

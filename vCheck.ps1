@@ -661,7 +661,9 @@ $p = 0
 	$TTR = [math]::round((Measure-Command {$Details = . $_.FullName}).TotalSeconds, 2)
 
 	Write-CustomOut ($global:lang.pluginEnd -f $PluginInfo["Title"], $PluginInfo["Author"], $PluginInfo["Version"], $p, $vCheckPlugins.count)
-
+	if ($Header -match "{count}") {
+		$Header = $Header -replace "{count}", @($Details).Count
+	}
 	$PluginResult += New-Object PSObject -Property @{"Title" = $PluginInfo["Title"];
 																	 "Author" = $PluginInfo["Author"];
 																	 "Version" = $PluginInfo["Version"];
@@ -671,6 +673,7 @@ $p = 0
 																	 "Header" = $Header;
 																	 "Comments" = $Comments;
 																	 "TimeToRun" = $TTR; }
+	[gc]::Collect()
 }
 Write-Progress -ID 1 -Activity $global:lang.pluginActivity -Status $global:lang.Complete -Completed
 

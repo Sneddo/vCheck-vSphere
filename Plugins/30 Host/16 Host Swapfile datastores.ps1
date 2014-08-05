@@ -8,13 +8,11 @@
 
 # Requires the vSphere provider for information
 Import-Provider vSphere
-$ClusterViews = Get-vCheckvSphereObject "ClusterViews"
-$VMH = Get-vCheckvSphereObject "Hosts"
 
 $cluswap = @()
-foreach ($clusview in $ClusterViews) {
+foreach ($clusview in (Get-vCheckvSphereObject "ClusterViews")) {
 	if ($clusview.ConfigurationEx.VmSwapPlacement -eq "hostLocal") {
-		$CluNodes = $VMH | where {$clusview.Host -contains $_.Id }
+		$CluNodes =  Get-vCheckvSphereObject "Hosts" | where {$clusview.Host -contains $_.Id }
 		foreach ($CluNode in $CluNodes) {
 			if ($CluNode.VMSwapfileDatastore.Name -eq $null){
 				if ($CluNode.ExtensionData.Config.LocalSwapDatastore.Value) {
@@ -37,3 +35,5 @@ $Display = "Table"
 $Author = "Alan Renouf"
 $PluginVersion = 1.3
 $PluginCategory = "vSphere"
+
+Remove-Variable cluswap

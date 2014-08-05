@@ -19,3 +19,5 @@ $Display = "Table"
 $Author = "Robert van den Nieuwendijk"
 $PluginVersion = 1.2
 $PluginCategory = "vSphere"
+
+Remove-Variable $Result

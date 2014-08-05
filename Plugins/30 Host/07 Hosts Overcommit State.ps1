@@ -56,3 +56,5 @@ $Display = "Table"
 $Author = "Alan Renouf"
 $PluginVersion = 1.4
 $PluginCategory = "vSphere"
+
+Remove-Variable OverCommit, VMH, VM
