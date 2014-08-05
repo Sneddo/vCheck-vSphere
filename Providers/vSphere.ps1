@@ -5,6 +5,9 @@ I should add a header...
 ################################################################################
 #                               Initialization                                 #
 ################################################################################
+# Init Provider hashtable
+$global:Providers.Add("vSphere", @{"Data" = @{}})
+
 # Load default strings
 $pLang = DATA {    
 ConvertFrom-StringData @' 
@@ -24,15 +27,13 @@ ConvertFrom-StringData @'
    collectDCluster = Collecting Detailed Cluster Objects
    collectDDatastore = Collecting Detailed Datastore Objects
    collectDDatastoreCluster = Collecting Detailed Datastore Cluster Objects
+   requirementNotFound = Requirement not found on this host: {0}
 '@ }
 
-# Add Provider strings to global lang variable
+# Add Provider strings to global provider variable
 Import-LocalizedData -BaseDirectory ($ScriptPath + "\lang") -FileName Provider-vSphere -BindingVariable pLang -ErrorAction SilentlyContinue
-$global:lang+=$pLang
-
-# Init Provider hashtable
-$global:Providers.Add("vSphere", @{"Data" = @{}})
-
+$global:Providers.vSphere.Add("lang",$pLang)
+Remove-Variable -Name pLang
 
 ################################################################################
 #                              REQUIRED FUNCTIONS                              #
@@ -42,23 +43,23 @@ $global:Providers.Add("vSphere", @{"Data" = @{}})
 # Disconnect-vCheck<<providerName>> - cleanup provider
 # Get-vCheck<<providerName>>Object - Get a vCheck Object
 
-function Connect-vCheckvSphere() {
+function global:Connect-vCheckvSphere() {
 	# Adding PowerCLI core snapin
-	if (!(get-pssnapin -name VMware.VimAutomation.Core -erroraction silentlycontinue)) {
-		add-pssnapin VMware.VimAutomation.Core
+	if (!(Get-PSSnapin -name VMware.VimAutomation.Core -erroraction silentlycontinue)) {
+		Add-PSSnapin VMware.VimAutomation.Core
 	}
 	$VIServer = $script:Server
 	$OpenConnection = $global:DefaultVIServers | where { $_.Name -eq $VIServer }
 	if($OpenConnection.IsConnected) {
-		Write-CustomOut $global:lang.connReuse
+		Write-CustomOut $global:Providers.vSphere.lang.connReuse
 		$VIConnection = $OpenConnection
 	} else {
-		Write-CustomOut $global:lang.connOpen
+		Write-CustomOut $global:Providers.vSphere.lang.connOpen
 		$VIConnection = Connect-VIServer $VIServer
 	}
 
 	if (-not $VIConnection.IsConnected) {
-		Write-Error $global:lang.connError
+		Write-Error $global:Providers.vSphere.lang.connError
 	}
 }
 
@@ -82,20 +83,27 @@ function global:Get-vCheckvSphereObject  {
 	if ($force) {
 		$global:Providers.vSphere.Data.$ObjName = $null
 	}
-	# If we already have this object, return the cached value
-	if ($global:Providers.vSphere.Data.$ObjName -ne $null) {
-		return ($global:Providers.vSphere.Data.$ObjName)
-	}
-	else{
+	# If we do not have cashed data, recalculate
+	if ($global:Providers.vSphere.Data.$ObjName -eq $null) {
 		switch ($ObjName) {
-				"Hosts"  { Write-CustomOut $global:lang.collectHost;
-						  $value = (Get-VMHost | Sort Name);  }
-			"HostsViews" { Write-CustomOut $global:lang.collectDHost;
-						  $value = Get-View -ViewType hostsystem }
+			"ServiceInstance" { Write-CustomOut $pLang.collectDVIO
+							    $ServiceInstance = get-view ServiceInstance }
+			"AlarmManager"	{ $ServiceInstance = Get-vCheckvSphereObject ServiceInstance
+							  Write-CustomOut $pLang.collectAlarm
+							  $alarmMgr = get-view $ServiceInstance.Content.alarmManager }
+			"ClusterViews"	{ Write-CustomOut $pLang.collectDCluster
+							  $value = Get-View -ViewType ClusterComputeResource }
+			"Hosts"  		{ Write-CustomOut $global:Providers.vSphere.lang.collectHost;
+							  $value = (Get-VMHost | Sort Name);  }
+			"HostsViews"	{ Write-CustomOut $global:Providers.vSphere.lang.collectDHost;
+							  $value = Get-View -ViewType hostsystem }
+			"VMs" 			{ Write-CustomOut $global:Providers.vSphere.lang.collectVM
+							  $value = Get-VM | Sort Name }
+
 		}
 		$global:Providers.vSphere.Data.Add($ObjName, $value)
 	}
-	return $value
+	return ($global:Providers.vSphere.Data.$ObjName)
 }
 
 ################################################################################
@@ -103,6 +111,25 @@ function global:Get-vCheckvSphereObject  {
 ################################################################################
 # This section contains any global functions for this provider to save on code 
 # duplication
+function Add-vCheckvSphereRequirement ([string]$Name) {
+	if ((Get-PSSnapin -name $Name -erroraction silentlycontinue) -or ((Get-Module $Name).Count -gt 0)) {
+		return $true
+	}
+	
+	if ((Get-PSSnapin -Registered | Where {$_.name -eq $Name }).Count -gt 0) {
+		Add-PSSnapin $Name
+		return $true
+	}
+	
+	if ((Get-Module -ListAvailable | Where {$_.name -eq $Name }).Count -gt 0) {
+		Import-Module $Name
+	}
+	
+	# if we get this far, the requirement is not available
+	Write-Warning $global:Providers.vSphere.lang.requirementNotFound -f $Name
+	return $false
+}
+
 function Get-VMLastPoweredOffDate {
   param([Parameter(Mandatory=$true,ValueFromPipeline=$true)]
         [VMware.VimAutomation.ViCore.Impl.V1.Inventory.VirtualMachineImpl] $vm)
